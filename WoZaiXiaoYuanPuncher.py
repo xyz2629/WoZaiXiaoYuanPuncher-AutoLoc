@@ -4,10 +4,59 @@ import requests
 import json
 import time
 import hashlib
+import random
 sign_time = int(round(time.time() * 1000)) #13位
 from urllib.parse import urlencode
 from utils.dingdingBotUtil import DingDingBot
 
+SchoolLocation = self.data['SchoolLocation']
+#"陕西省西安市未央区西安工业大学"
+key = self.data['key']
+#"17c0b0909190e8fb031f927441f2ea35"
+randomswitch = self.data['randomswitch']
+
+class Getinfo:
+    # 高德地图 搜索接口地址
+    url = "https://restapi.amap.com/v3/geocode/geo?address=" + SchoolLocation + "&key=" + key
+    # 取得结果
+    res = requests.get(url)
+    res = eval(res.text)
+    # 取得的结果内geocodes为接下来所需结果
+    res = res['geocodes']
+    # 将list值转化为普通值
+    res = res[0]
+    # 经纬度
+    def location(res):
+        location=res['location']
+        return location
+    locloc = res['location']
+    # 利用经纬度获取详细地址信息和towncode（主要是towncode）
+    url1 = "https://restapi.amap.com/v3/geocode/regeo?location=" + locloc + "&key=" + key
+    res1 = requests.get(url1)
+    res1 = eval(res1.text)
+    res2 = res1['regeocode']
+    # 取得地址详细信息
+    def location_info(res2):
+        location_info=res2['addressComponent']
+        return location_info
+    res3 = res2['addressComponent']
+    # 取得街道信息
+    def streetinfo(res3):
+        streetinfo = res3['streetNumber']
+        return streetinfo
+    # 上方取得的citycode为县级代码，而我在校园使用的市级，取得“xx市”
+    loc_city = res3['city']
+    # 请求 该市位置信息
+    url = "https://restapi.amap.com/v3/geocode/geo?address=" + loc_city + "&key=" + key
+    res4 = requests.get(url)
+    res4 = eval(res4.text)
+    # 取得结果
+    res4 = res4['geocodes']
+    res4 = res4[0]
+    # 结果作为city_code
+    def city_code(res4):
+        city_code = res4['adcode']
+        return city_code
 
 class WoZaiXiaoYuanPuncher:
     def __init__(self, item):
@@ -105,24 +154,52 @@ class WoZaiXiaoYuanPuncher:
         self.header['Host'] = "student.wozaixiaoyuan.com"
         self.header['Content-Type'] = "application/x-www-form-urlencoded"
         url = "https://student.wozaixiaoyuan.com/heat/save.json"
-        content = f"{self.data['province']}_{sign_time}_{self.data['city']}"
+
+        # 将高德地图所有结果导入
+        location = Getinfo.location(Getinfo.res)
+        location_info = Getinfo.location_info(Getinfo.res2)
+        streetinfo = Getinfo.streetinfo(Getinfo.res3)
+        city_code = Getinfo.city_code(Getinfo.res4)
+        coordinate = location.split(",")
+
+        # 经纬度6位数后面填充随机数，对定位结果影响不大，但更接近我在校园真实经纬度获取
+        if randomswitch == 1:
+            random_a = random.randint(0, 9999999)
+            random_a = str(random_a)
+            random_b = random.randint(0, 9999999)
+            random_b = str(random_b)
+        else:
+            random_a = ""
+            random_b = ""
+
+        # 导入towncode
+        towncode = location_info['towncode']
+        towncode = towncode[:-3]
+
+        # 我在校园乡村打卡无此street结果，仅精确到镇，所以如此处理：如果检测到高德地图未返回street结果，则将list元素为空时的‘[]’去掉，保证结果正常
+        if len(streetinfo['street']) == 0:
+            streetinfo['street'] = ""
+
+        # signature生成
+        content = f"{location_info['province']}_{sign_time}_{location_info['city']}"
         signature = hashlib.sha256(content.encode('utf-8')).hexdigest() #我在校园22.4.17更新：加密方式为SHA256，格式为 province_timestamp_city
+
         sign_data = {
             "answers": '["0"]',
-            "seq": str(seq),
-            "temperature": self.data['temperature'],
-            "latitude": self.data['latitude'],
-            "longitude": self.data['longitude'],
-            "country": self.data['country'],
-            "city": self.data['city'],
-            "district": self.data['district'],
-            "province": self.data['province'],
-            "township": self.data['township'],
-            "street": self.data['street'],
-            "myArea": self.data['myArea'],
-            "areacode": self.data['areacode'],
-            "userId": self.data['userId'],
-            "city_code": self.data['city_code'],
+            "temperature": "36.0",
+            "latitude": coordinate[1] + random_b,
+            "longitude": coordinate[0] + random_a,
+            "country": location_info['country'],
+            "city": location_info['city'],
+            "district": location_info['district'],
+            "province": location_info['province'],
+            "township": location_info['township'],
+            "street": streetinfo['street'],
+            "myArea": "",   # self.data['myArea'],
+            "areacode": location_info['adcode'],
+            "towncode": towncode,
+            "citycode": "156" + city_code,
+            "userId": "",
             "timestampHeader": sign_time,
             "signatureHeader": signature
         }
