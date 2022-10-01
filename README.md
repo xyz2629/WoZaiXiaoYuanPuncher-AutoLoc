@@ -12,8 +12,8 @@
 
 #### 本次更新：
 
-1. 增加轻量级数据库SQLite，在首次登陆后，记录账号的jwsession，避免频繁登陆导致账号异常/冻结（与登录有关的问题可以看[ISSUE 1](https://github.com/zimin9/WoZaiXiaoYuanPuncher/issues/1)）。当jwsession失效时，程序才会再次发起登陆、更新jwsession。
-2. 增加PushPlus、钉钉机器人推送提醒功能
+1. 仅需在source.json内写入学校地址/家庭地址，格式为省市县街道路，如"SchoolLocation":"陕西省西安市长安区西长安街邮电大学"
+2. 再需要在source.json内写入高德地图api key，如"key":"17c0b0909xxx0xxxxxxx41f2ea35"
 
 
 ## 🚩 快速开始
